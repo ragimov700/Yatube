@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container">
+  <br><h1><center>Ошибка 404 :(</h1><br>
+  <h3><center>Данной страницы не существует</h3><br>
+  <a
+    class="btn btn-outline-dark btn-lg d-block mx-auto"
+    href="{% url 'posts:index' %}">
+    На главную
+  </a>
+  <br>
+</div>
+{% endblock %}
