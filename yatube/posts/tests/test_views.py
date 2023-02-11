@@ -376,3 +376,81 @@ class FollowUsersTests(TestCase):
         self.assertEqual(
             posts_count_client, len(response_client.context['page_obj']),
             'Есть посты у неподписанного в follow после создания поста')
+
+
+class FollowServiceTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.author = User.objects.create_user(username='author')
+        cls.author_client = Client()
+        cls.author_client.force_login(cls.author)
+
+        cls.follower = User.objects.create_user(username='follower')
+        cls.follower_client = Client()
+        cls.follower_client.force_login(cls.follower)
+
+        cls.user = User.objects.create_user(username='user')
+        cls.user_client = Client()
+        cls.user_client.force_login(cls.user)
+
+        cls.guest = User.objects.create_user(username='guest')
+        cls.guest_client = Client()
+
+    def test_follow_unfollow_sistem(self):
+        """Авторизованный пользователь может подписываться на других
+        пользователей и удалять их из подписок.
+        Неавторизованный пользователь не может подписаться"""
+        username = self.author.username
+
+        def following_existion(user, author):
+            following = Follow.objects.filter(
+                user=user, author=author).exists()
+            return following
+
+        login_url = reverse('users:login')
+        follow_url = reverse('posts:profile_follow',
+                             kwargs={'username': username})
+        redirect_url = reverse('posts:profile',
+                               kwargs={'username': username})
+        guest_redirect_url = f'{login_url}?next={follow_url}'
+
+        follow_response = self.follower_client.post(follow_url)
+        self.assertTrue(following_existion(self.follower, self.author))
+        self.assertRedirects(follow_response, redirect_url)
+
+        unfollow_response = self.follower_client.post(
+            reverse('posts:profile_unfollow',
+                    kwargs={'username': username})
+        )
+        self.assertFalse(following_existion(self.follower, self.author))
+        self.assertRedirects(unfollow_response, redirect_url)
+
+        guest_follow_response = self.guest_client.post(
+            reverse('posts:profile_follow',
+                    kwargs={'username': username})
+        )
+        self.assertFalse(following_existion(self.guest, self.author))
+        self.assertRedirects(guest_follow_response, guest_redirect_url)
+
+    def test_follow_view_page(self):
+        """Новая запись пользователя появляется в ленте тех,
+        кто на него подписан и не появляется в ленте тех, кто не подписан."""
+        self.follower_client.post(
+            reverse('posts:profile_follow',
+                    kwargs={'username': self.author.username})
+        )
+        post = Post.objects.create(
+            text='Тестовый текст',
+            author=self.author
+        )
+
+        follower_index_response = self.follower_client.get(
+            reverse('posts:follow_index')
+        )
+        self.assertContains(follower_index_response, post)
+
+        not_follower_index_response = self.user_client.get(
+            reverse('posts:follow_index')
+        )
+        self.assertNotContains(not_follower_index_response, post)

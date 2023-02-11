@@ -9,7 +9,7 @@ from yatube.settings import POSTS_PER_PAGE
 
 @cache_page(5, key_prefix='index_page')
 def index(request):
-    post_list = Post.objects.order_by('-pub_date')
+    post_list = Post.objects.select_related('author', 'group')
     paginator = Paginator(post_list, POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -40,7 +40,8 @@ def profile(request, username):
     page_obj = paginator.get_page(page_number)
     following = None
     if request.user.is_authenticated:
-        following = Follow.objects.filter(user=request.user, author=user)
+        following = Follow.objects.filter(
+            user=request.user, author=user).exists()
     context = {
         'author': user,
         'page_obj': page_obj,
